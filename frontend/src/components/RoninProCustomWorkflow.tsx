@@ -1462,27 +1462,46 @@ export default function RoninProCustomWorkflow({ onSendToFineProcess }: RoninPro
 
       <div>
         <Text strong>{t('roninProWorkflowImages')}</Text>
-        <StashDropZone
-          onStashDrop={(file) => {
-            setFileItems((prev) => [...prev, createWorkflowInputFile(file)])
-          }}
-          maxSizeMB={20}
-          onSizeError={() => message.error(t('imageSizeError'))}
-        >
-          <Dragger
-            multiple
-            accept={IMAGE_ACCEPT.join(',')}
-            showUploadList={false}
-            beforeUpload={(file) => {
-              setFileItems((prev) => [...prev, createWorkflowInputFile(file)])
-              return false
+        <div style={{ display: 'flex', gap: 8, alignItems: 'stretch' }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <StashDropZone
+              onStashDrop={(file) => {
+                setFileItems((prev) => [...prev, createWorkflowInputFile(file)])
+              }}
+              maxSizeMB={20}
+              onSizeError={() => message.error(t('imageSizeError'))}
+            >
+              <Dragger
+                multiple
+                accept={IMAGE_ACCEPT.join(',')}
+                showUploadList={false}
+                beforeUpload={(file) => {
+                  setFileItems((prev) => [...prev, createWorkflowInputFile(file)])
+                  return false
+                }}
+              >
+                <p className="ant-upload-drag-icon">
+                  <ExpandOutlined />
+                </p>
+                <p className="ant-upload-text">{t('roninProWorkflowUploadHint')}</p>
+              </Dragger>
+            </StashDropZone>
+          </div>
+          <Button
+            danger
+            disabled={fileItems.length === 0 || running}
+            onClick={clearWorkflowInputFiles}
+            style={{
+              height: 'auto',
+              minHeight: 86,
+              whiteSpace: 'normal',
+              textAlign: 'center',
+              flexShrink: 0,
             }}
           >
-            <p className="ant-upload-drag-icon">
-              <ExpandOutlined />
-            </p>
-            <p className="ant-upload-text">{t('roninProWorkflowUploadHint')}</p>
-          </Dragger>
+            {t('roninProWorkflowClearSelectedImages')}
+          </Button>
+        </div>
           {fileItems.length > 0 && (
             <div
               className="ronin-workflow-input-thumbs"
@@ -1593,7 +1612,6 @@ export default function RoninProCustomWorkflow({ onSendToFineProcess }: RoninPro
               ))}
             </div>
           )}
-        </StashDropZone>
       </div>
 
       <div style={{ display: 'flex', gap: 8, width: '100%' }}>
@@ -1608,9 +1626,6 @@ export default function RoninProCustomWorkflow({ onSendToFineProcess }: RoninPro
               ? 'roninProWorkflowRunTargeted'
               : 'roninProWorkflowRunAll'
           )}
-        </Button>
-        <Button disabled={fileItems.length === 0 || running} onClick={clearWorkflowInputFiles}>
-          {t('roninProWorkflowClearSelectedImages')}
         </Button>
       </div>
 
