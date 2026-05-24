@@ -179,6 +179,13 @@ export default function RoninProCustomWorkflow({ onSendToFineProcess }: RoninPro
     })
   }, [])
 
+  const clearWorkflowInputFiles = useCallback(() => {
+    setFileItems((prev) => {
+      prev.forEach((item) => URL.revokeObjectURL(item.thumbUrl))
+      return []
+    })
+  }, [])
+
   const updateNodeParam = useCallback((id: string, key: string, value: number) => {
     setGraphNodes((list) =>
       list.map((n) => (n.id === id ? { ...n, params: { ...n.params, [key]: value } } : n))
@@ -1589,13 +1596,23 @@ export default function RoninProCustomWorkflow({ onSendToFineProcess }: RoninPro
         </StashDropZone>
       </div>
 
-      <Button type="primary" loading={running} onClick={handleRunAll} block>
-        {t(
-          graphNodes.some((n) => n.type === 'workflowInputImage')
-            ? 'roninProWorkflowRunTargeted'
-            : 'roninProWorkflowRunAll'
-        )}
-      </Button>
+      <div style={{ display: 'flex', gap: 8, width: '100%' }}>
+        <Button
+          type="primary"
+          loading={running}
+          onClick={handleRunAll}
+          style={{ flex: 1, minWidth: 0 }}
+        >
+          {t(
+            graphNodes.some((n) => n.type === 'workflowInputImage')
+              ? 'roninProWorkflowRunTargeted'
+              : 'roninProWorkflowRunAll'
+          )}
+        </Button>
+        <Button disabled={fileItems.length === 0 || running} onClick={clearWorkflowInputFiles}>
+          {t('roninProWorkflowClearSelectedImages')}
+        </Button>
+      </div>
 
       {results.length > 0 && (
         <div>
