@@ -1649,14 +1649,16 @@ export default function RoninProCustomWorkflow({ onSendToFineProcess }: RoninPro
                   allowClear
                   style={{ width: 220 }}
                 />
-                <InputNumber
-                  min={1}
-                  max={64}
-                  value={spriteColumns}
-                  onChange={(v) => setSpriteColumns(Math.max(1, Math.round(v ?? 3)))}
-                  addonBefore={t('roninProWorkflowSpriteColumns')}
-                  style={{ width: 140 }}
-                />
+                <div style={{ width: 140 }}>
+                  <Text style={{ fontSize: 12, color: '#9aa3b5' }}>{t('roninProWorkflowSpriteColumns')}</Text>
+                  <InputNumber
+                    min={1}
+                    max={64}
+                    value={spriteColumns}
+                    onChange={(v) => setSpriteColumns(Math.max(1, Math.round(v ?? 3)))}
+                    style={{ width: '100%', marginTop: 4 }}
+                  />
+                </div>
                 <div style={{ width: 140 }}>
                   <Text style={{ fontSize: 12, color: '#9aa3b5' }}>{t('roninProWorkflowSpriteFps')}</Text>
                   <Select
