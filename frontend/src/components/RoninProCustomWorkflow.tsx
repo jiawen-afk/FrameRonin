@@ -34,6 +34,8 @@ import {
   type WorkflowNodeType,
 } from '../lib/roninProWorkflow'
 import { WORKFLOW_BPSET_PRESETS, WORKFLOW_BPSETI_DIRECT_PRESETS } from '../lib/workflowBpsetPresets'
+import { canUseLocalWorkspace } from '../localWorkspace/context'
+import { exportWorkflowResultsToDirectory } from '../lib/roninProWorkflowBatchExport'
 import StashDropZone from './StashDropZone'
 import WorkflowBlueprintCanvas, {
   BLUEPRINT_INPUT_IMAGE_NODE_WIDTH,
@@ -146,6 +148,9 @@ export default function RoninProCustomWorkflow({ onSendToFineProcess }: RoninPro
   const [running, setRunning] = useState(false)
   /** 导出预设名：写入 JSON 的 presetName，并用于下载文件名 */
   const [presetName, setPresetName] = useState('')
+  const [batchExportPrefix, setBatchExportPrefix] = useState('workflow')
+  const [batchExportDirectory, setBatchExportDirectory] = useState<FileSystemDirectoryHandle | null>(null)
+  const [batchExporting, setBatchExporting] = useState(false)
   const [finishedPresetsOpen, setFinishedPresetsOpen] = useState(false)
   const [directRunPresetsOpen, setDirectRunPresetsOpen] = useState(false)
   const [bpsetLoadingId, setBpsetLoadingId] = useState<string | null>(null)
@@ -421,6 +426,50 @@ export default function RoninProCustomWorkflow({ onSendToFineProcess }: RoninPro
 
   const handleRunAll = () => {
     void executeParsedWorkflow(graphNodes, graphEdges)
+  }
+
+  const selectBatchExportDirectory = async () => {
+    if (!canUseLocalWorkspace || !window.showDirectoryPicker) {
+      message.warning(t('roninProWorkflowBatchExportUnsupported'))
+      return
+    }
+    try {
+      const h = await window.showDirectoryPicker({ mode: 'readwrite' })
+      setBatchExportDirectory(h)
+      message.success(t('roninProWorkflowBatchExportDirectorySet'))
+    } catch {
+      /* user cancelled */
+    }
+  }
+
+  const handleBatchExportResults = async () => {
+    if (results.length === 0) return
+    let directory = batchExportDirectory
+    if (!directory) {
+      if (!canUseLocalWorkspace || !window.showDirectoryPicker) {
+        message.warning(t('roninProWorkflowBatchExportUnsupported'))
+        return
+      }
+      try {
+        directory = await window.showDirectoryPicker({ mode: 'readwrite' })
+        setBatchExportDirectory(directory)
+      } catch {
+        return
+      }
+    }
+    setBatchExporting(true)
+    try {
+      const count = await exportWorkflowResultsToDirectory(results, {
+        directory,
+        prefix: batchExportPrefix,
+      })
+      message.success(t('roninProWorkflowBatchExportDone', { count }))
+    } catch (e) {
+      console.error(e)
+      message.error(t('roninProWorkflowBatchExportFailed'))
+    } finally {
+      setBatchExporting(false)
+    }
   }
 
   const loadAndRunBpsetiDirect = async (presetId: string, url: string) => {
@@ -1509,6 +1558,31 @@ export default function RoninProCustomWorkflow({ onSendToFineProcess }: RoninPro
       {results.length > 0 && (
         <div>
           <Text strong>{t('roninProWorkflowResults')}</Text>
+          <Space wrap style={{ marginTop: 10, width: '100%' }} align={'center'}>
+            <Button onClick={() => void selectBatchExportDirectory()}>
+              {t('roninProWorkflowBatchExportPickDirectory')}
+            </Button>
+            <Input
+              value={batchExportPrefix}
+              onChange={(e) => setBatchExportPrefix(e.target.value)}
+              placeholder={t('roninProWorkflowBatchExportPrefixPlaceholder')}
+              maxLength={80}
+              allowClear
+              style={{ width: 220 }}
+            />
+            <Button
+              type={'primary'}
+              loading={batchExporting}
+              onClick={() => void handleBatchExportResults()}
+            >
+              {t('roninProWorkflowBatchExport')}
+            </Button>
+            <Text type={'secondary'} style={{ fontSize: 12 }}>
+              {batchExportDirectory
+                ? t('roninProWorkflowBatchExportDirectoryName', { name: batchExportDirectory.name })
+                : t('roninProWorkflowBatchExportNoDirectory')}
+            </Text>
+          </Space>
           <Row gutter={[16, 16]} style={{ marginTop: 12 }}>
             {results.map((r) => (
               <Col xs={24} sm={12} key={r.url}>
