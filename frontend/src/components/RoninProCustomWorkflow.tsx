@@ -35,7 +35,10 @@ import {
 } from '../lib/roninProWorkflow'
 import { WORKFLOW_BPSET_PRESETS, WORKFLOW_BPSETI_DIRECT_PRESETS } from '../lib/workflowBpsetPresets'
 import { canUseLocalWorkspace } from '../localWorkspace/context'
-import { exportWorkflowResultsToDirectory } from '../lib/roninProWorkflowBatchExport'
+import {
+  composeWorkflowSpriteSheet,
+  exportWorkflowResultsToDirectory,
+} from '../lib/roninProWorkflowBatchExport'
 import StashDropZone from './StashDropZone'
 import WorkflowBlueprintCanvas, {
   BLUEPRINT_INPUT_IMAGE_NODE_WIDTH,
@@ -148,9 +151,12 @@ export default function RoninProCustomWorkflow({ onSendToFineProcess }: RoninPro
   const [running, setRunning] = useState(false)
   /** 导出预设名：写入 JSON 的 presetName，并用于下载文件名 */
   const [presetName, setPresetName] = useState('')
+  const [workflowExportMode, setWorkflowExportMode] = useState<'batch' | 'sprite'>('batch')
   const [batchExportPrefix, setBatchExportPrefix] = useState('workflow')
   const [batchExportDirectory, setBatchExportDirectory] = useState<FileSystemDirectoryHandle | null>(null)
   const [batchExporting, setBatchExporting] = useState(false)
+  const [spriteColumns, setSpriteColumns] = useState(3)
+  const [spriteFps, setSpriteFps] = useState<12 | 24>(12)
   const [finishedPresetsOpen, setFinishedPresetsOpen] = useState(false)
   const [directRunPresetsOpen, setDirectRunPresetsOpen] = useState(false)
   const [bpsetLoadingId, setBpsetLoadingId] = useState<string | null>(null)
@@ -444,6 +450,42 @@ export default function RoninProCustomWorkflow({ onSendToFineProcess }: RoninPro
 
   const handleBatchExportResults = async () => {
     if (results.length === 0) return
+    if (workflowExportMode === 'sprite') {
+      try {
+        setBatchExporting(true)
+        const blobs: Blob[] = []
+        for (const r of results) {
+          const res = await fetch(r.url)
+          blobs.push(await res.blob())
+        }
+        const sprite = await composeWorkflowSpriteSheet(blobs, {
+          columns: spriteColumns,
+          fps: spriteFps,
+        })
+        const pngUrl = URL.createObjectURL(sprite.pngBlob)
+        const pngName = `${batchExportPrefix || 'workflow'}_sprite.png`
+        const pngLink = document.createElement('a')
+        pngLink.href = pngUrl
+        pngLink.download = pngName
+        pngLink.click()
+        URL.revokeObjectURL(pngUrl)
+
+        const jsonBlob = new Blob([sprite.json], { type: 'application/json' })
+        const jsonUrl = URL.createObjectURL(jsonBlob)
+        const jsonLink = document.createElement('a')
+        jsonLink.href = jsonUrl
+        jsonLink.download = `${batchExportPrefix || 'workflow'}_sprite.json`
+        jsonLink.click()
+        URL.revokeObjectURL(jsonUrl)
+        message.success(t('roninProWorkflowDone'))
+      } catch (e) {
+        console.error(e)
+        message.error(t('roninProWorkflowSpriteExportFailed'))
+      } finally {
+        setBatchExporting(false)
+      }
+      return
+    }
     let directory = batchExportDirectory
     if (!directory) {
       if (!canUseLocalWorkspace || !window.showDirectoryPicker) {
@@ -1558,30 +1600,80 @@ export default function RoninProCustomWorkflow({ onSendToFineProcess }: RoninPro
       {results.length > 0 && (
         <div>
           <Text strong>{t('roninProWorkflowResults')}</Text>
-          <Space wrap style={{ marginTop: 10, width: '100%' }} align={'center'}>
-            <Button onClick={() => void selectBatchExportDirectory()}>
-              {t('roninProWorkflowBatchExportPickDirectory')}
-            </Button>
-            <Input
-              value={batchExportPrefix}
-              onChange={(e) => setBatchExportPrefix(e.target.value)}
-              placeholder={t('roninProWorkflowBatchExportPrefixPlaceholder')}
-              maxLength={80}
-              allowClear
-              style={{ width: 220 }}
-            />
-            <Button
-              type={'primary'}
-              loading={batchExporting}
-              onClick={() => void handleBatchExportResults()}
-            >
-              {t('roninProWorkflowBatchExport')}
-            </Button>
-            <Text type={'secondary'} style={{ fontSize: 12 }}>
-              {batchExportDirectory
-                ? t('roninProWorkflowBatchExportDirectoryName', { name: batchExportDirectory.name })
-                : t('roninProWorkflowBatchExportNoDirectory')}
-            </Text>
+          <Space direction="vertical" style={{ marginTop: 10, width: '100%' }} size="small">
+            <Space wrap align="center">
+              <Text style={{ fontSize: 12, color: '#9aa3b5' }}>{t('roninProWorkflowExportMode')}</Text>
+              <Select
+                value={workflowExportMode}
+                onChange={(v) => setWorkflowExportMode(v)}
+                options={[
+                  { value: 'batch', label: t('roninProWorkflowExportModeBatch') },
+                  { value: 'sprite', label: t('roninProWorkflowExportModeSprite') },
+                ]}
+                style={{ width: 180 }}
+              />
+            </Space>
+            {workflowExportMode === 'batch' ? (
+              <Space wrap align="center">
+                <Button onClick={() => void selectBatchExportDirectory()}>
+                  {t('roninProWorkflowBatchExportPickDirectory')}
+                </Button>
+                <Input
+                  value={batchExportPrefix}
+                  onChange={(e) => setBatchExportPrefix(e.target.value)}
+                  placeholder={t('roninProWorkflowBatchExportPrefixPlaceholder')}
+                  maxLength={80}
+                  allowClear
+                  style={{ width: 220 }}
+                />
+                <Button
+                  type="primary"
+                  loading={batchExporting}
+                  onClick={() => void handleBatchExportResults()}
+                >
+                  {t('roninProWorkflowBatchExport')}
+                </Button>
+                <Text type="secondary" style={{ fontSize: 12 }}>
+                  {batchExportDirectory
+                    ? t('roninProWorkflowBatchExportDirectoryName', { name: batchExportDirectory.name })
+                    : t('roninProWorkflowBatchExportNoDirectory')}
+                </Text>
+              </Space>
+            ) : (
+              <Space wrap align="center">
+                <Input
+                  value={batchExportPrefix}
+                  onChange={(e) => setBatchExportPrefix(e.target.value)}
+                  placeholder={t('roninProWorkflowBatchExportPrefixPlaceholder')}
+                  maxLength={80}
+                  allowClear
+                  style={{ width: 220 }}
+                />
+                <InputNumber
+                  min={1}
+                  max={64}
+                  value={spriteColumns}
+                  onChange={(v) => setSpriteColumns(Math.max(1, Math.round(v ?? 3)))}
+                  addonBefore={t('roninProWorkflowSpriteColumns')}
+                  style={{ width: 140 }}
+                />
+                <div style={{ width: 140 }}>
+                  <Text style={{ fontSize: 12, color: '#9aa3b5' }}>{t('roninProWorkflowSpriteFps')}</Text>
+                  <Select
+                    value={spriteFps}
+                    onChange={(v) => setSpriteFps(v as 12 | 24)}
+                    options={[
+                      { value: 12, label: t('roninProWorkflowSpriteFps12') },
+                      { value: 24, label: t('roninProWorkflowSpriteFps24') },
+                    ]}
+                    style={{ width: '100%', marginTop: 4 }}
+                  />
+                </div>
+                <Button type="primary" loading={batchExporting} onClick={() => void handleBatchExportResults()}>
+                  {t('roninProWorkflowExportModeSprite')}
+                </Button>
+              </Space>
+            )}
           </Space>
           <Row gutter={[16, 16]} style={{ marginTop: 12 }}>
             {results.map((r) => (
